@@ -12,7 +12,7 @@ Po zmianie czegokolwiek tutaj uruchom:
 ../ADMIN/sync-core.sh
 ```
 
-Skrypt skopiuje Core do wszystkich aplikacji (Electron → `core/*.js`, Python → `core/pitaya_core.py`). Kompilacja przez Pitayas Admin robi to sama.
+Skrypt skopiuje Core do wszystkich aplikacji (Electron → `core/*.js`, Node bez okna → `core/node.js` + rejestr i sterowanie, Python → `core/pitaya_core.py`). Kompilacja przez Pitayas Admin robi to sama.
 
 ## Co daje Core
 
@@ -22,6 +22,7 @@ Skrypt skopiuje Core do wszystkich aplikacji (Electron → `core/*.js`, Python �
 | `registry.js`    | rejestr aplikacji, stan „działa”, uruchamianie innych aplikacji (bez Electrona) |
 | `control.js`     | kanał sterowania: lokalne gniazdo z poleceniami JSON                     |
 | `python/`        | to samo dla aplikacji w Pythonie                                          |
+| `node.js`        | to samo co `index.js` dla aplikacji Node bez Electrona (serwery, usługi) |
 | `cli.js`         | podgląd z terminala: `node cli.js list / send <id> <cmd> / launch <id>`   |
 | `updater.js`     | aktualizacje z GitHuba (git pull / nowy AppImage / strona wydania)        |
 | `bridge.js`      | `window.pitayaBridge` dla okna aplikacji                                  |
@@ -96,6 +97,16 @@ core.settings.set('encoder', 'nvenc');
 core.setStatus({ converting: 2 });                       // widoczne dla huba
 core.control.handle('convert-file', (args) => queue(args.path));
 core.send('deck', 'status').then(console.log);           // rozmowa z inną aplikacją
+```
+
+Node bez Electrona (Pitaya Streams):
+
+```js
+const core = require('../core/node').create({ id: 'stremio', folder: 'Stremio', name: 'Pitaya Streams',
+                                             appDir: path.join(__dirname, '..'), main: __filename });
+if (!core.singleInstance(() => openBrowser())) return;   // „show” z huba = otwórz stronę aplikacji
+core.start();
+core.setStatus({ url: 'http://127.0.0.1:7000' });
 ```
 
 Python (Pitaya Book):

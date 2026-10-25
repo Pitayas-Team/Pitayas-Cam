@@ -401,6 +401,8 @@
           <span class="url">https://${a.ip}:${s.port}</span>
           <button class="m-btn icon-only small" data-copy="https://${a.ip}:${s.port}" title="Kopiuj adres"><svg class="ico"><use href="#i-copy"/></svg></button>
         </div>`).join('') || '<div class="m-small">Brak połączenia sieciowego.</div>';
+      if (s.addresses.length) document.getElementById('urlList').insertAdjacentHTML('beforeend',
+        `<div class="m-small">Aplikacja Pitayas na telefonie: komputer <b>${s.addresses[0].ip}</b>, port Cam <b>${s.appPort}</b>.</div>`);
     }
     document.getElementById('urlList').addEventListener('click', (e) => {
       const b = e.target.closest('[data-copy]');

@@ -33,6 +33,7 @@ let isQuitting = false;
 let wss = null;
 let httpServer = null;
 let localServer = null;
+let appServer = null;
 
 const virtualcam = require('./virtualcam');
 const MASTER_DEV = virtualcam.DEVICE;
@@ -42,6 +43,9 @@ const cfg = core.settings.all();
 const PORT = iphone.safePort(cfg.port);
 // Drugi port (tylko 127.0.0.1) dla telefonów z Androidem podłączonych kablem przez adb reverse
 const LOCAL_PORT = iphone.safePort(PORT + 1) === PORT + 1 ? PORT + 1 : PORT - 1;
+// Trzeci port dla aplikacji Pitayas na telefonie (Android/iPhone): zwykły HTTP + WebSocket w sieci.
+// Aplikacja sama ma bezpieczny kontekst dla aparatu, a samopodpisanego certyfikatu nie przyjmie.
+const APP_PORT = PORT + 2;
 if (PORT !== parseInt(cfg.port, 10)) {
     core.settings.set('port', PORT);
     core.log.warn(`Port ${cfg.port} jest blokowany przez przeglądarki — zmieniono na ${PORT}`);
@@ -85,8 +89,21 @@ function startHttpServer() {
     localServer.on('error', (err) => core.log.error(`Serwer lokalny (port ${LOCAL_PORT}):`, err.message));
     localServer.listen(LOCAL_PORT, '127.0.0.1');
 
+    // Aplikacja Pitayas: /info do sprawdzenia, czy Cam działa, reszta to WebSocket z klatkami
+    appServer = http.createServer((req, res) => {
+        if (req.url === '/info') {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+            res.end(JSON.stringify({ app: 'cam', name: 'Pitaya Cam', version: app.getVersion(), busy: Boolean(wss && wss.clients.size) }));
+        } else {
+            res.writeHead(404);
+            res.end();
+        }
+    });
+    appServer.on('error', (err) => core.log.error(`Serwer aplikacji (port ${APP_PORT}):`, err.message));
+    appServer.listen(APP_PORT, '0.0.0.0');
+
     wss = new WebSocket.Server({ noServer: true });
-    for (const srv of [httpServer, localServer]) {
+    for (const srv of [httpServer, localServer, appServer]) {
         srv.on('upgrade', (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req)));
     }
 
@@ -236,6 +253,7 @@ ipcMain.handle('detect-widget-style', async (event, url) => {
 // Stan iPhone'a dla okna: adresy (kabel / Wi‑Fi) i czy telefon jest podłączony kablem
 ipcMain.handle('iphone-status', () => ({
     port: PORT,
+    appPort: APP_PORT,
     server: Boolean(httpServer && httpServer.listening),
     addresses: iphone.listAddresses(),
     usb: iphone.usbStatus(),
@@ -310,6 +328,7 @@ function createTray() {
                                                    isQuitting = true;
                                                    stopStreaming();
                                                    if (httpServer) httpServer.close();
+        if (appServer) appServer.close();
                                                    app.quit();
                                                }
                                                }
@@ -331,6 +350,7 @@ core.registerIpc({
         isQuitting = true;
         stopStreaming();
         if (httpServer) httpServer.close();
+        if (appServer) appServer.close();
     },
 });
 ipcMain.handle('stop-stream', async () => {
